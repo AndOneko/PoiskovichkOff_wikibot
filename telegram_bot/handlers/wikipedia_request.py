@@ -15,19 +15,22 @@ from selenium import webdriver
 
 
 class FSMRequest(StatesGroup):
+
     question = State()
     additional_question_request = State()
     additional_question = State()
 
 
-#@dp.message_handler(commands='Запрос', state=None)
-async def cm_start(message : types.Message):
+# @dp.message_handler(commands='Запрос', state=None)
+async def cm_start(message: types.Message):
     await FSMRequest.question.set()
-    await message.answer('Введите запрос\nДля того чтобы отменить запрос напишите отмена или воспользуйтесь коммандой /Отмена', reply_markup=cancel_kboard)
+    await message.answer(
+        'Введите запрос\nДля того чтобы отменить запрос напишите отмена или воспользуйтесь коммандой /Отмена',
+        reply_markup=cancel_kboard)
 
 
-#выход из машины состояний
-async def cancel_command(message : types.Message, state: FSMContext):
+# выход из машины состояний
+async def cancel_command(message: types.Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state is None:
         return
@@ -35,37 +38,74 @@ async def cancel_command(message : types.Message, state: FSMContext):
     await message.answer('Запрос отменен\nЧтобы продолжить введите /start или /help')
 
 
-#@dp.message_handler(state=FSMRequest.question)
-async def get_question(message : types.Message, state: FSMContext):
+# @dp.message_handler(state=FSMRequest.question)
+async def get_question(message: types.Message, state: FSMContext):
+    '''
+    В данной функции мы получаем поисковой запрос пользователя.
+    Проверяем, на каком языке сделан поисковой запрос.
+    Благодаря полученному ответу определяем какая часть кода будет работать.
+    Когда мы опредилили какая часть кода будет работать, мы задаем язык, на которам будет выведена информация на сайте.
+    После чего мы отправляем пользователю 4 сообщения, в которых указываем поисковой запрос пользователя, ссылку на статью,
+    заголовок статьи, краткое содержание и предлагаем посмотреть дополнительную информацию.
+    :param message: это сообщения получаемые от пользователя
+    :param state: FSMContext состояние, взятое из машины состояний, в котором находиться эта функция
+    :return:это сообщения,которые пользователь получает от бота, в которых бот передаёт найденную информацию
+    '''
     def match(text, alphabet=set('абвгдеёжзийклмнопрстуфхцчшщъыьэюя')):
         return not alphabet.isdisjoint(text.lower())
+    """
+    Объявляем функцию 'match', которая сравнивае вводимое значение и если оно совпадает с переменной 'aphabet'(Русский алфавит) - 
+    то оно выдаёт 'bool' значение 'True', в противном случае 'False'. Это нужно для проверки языка, на которм пользователь хочет найти информацию.
+    """
     seearch = match(message.text)
+
     if seearch == True:
         wikipedia.set_lang('ru')
         async with state.proxy() as data:
             data['question'] = message.text
+
         await FSMRequest.next()  # перевод на следующее состояние
-        await message.answer('Вот что нашлось по вашему запросу ' + str(data['question']) + ':', reply_markup=ReplyKeyboardRemove())  # , reply_markup=ReplyKeyboardRemove()
+        await message.answer('Вот что нашлось по вашему запросу ' + str(data['question']) + ':',reply_markup=ReplyKeyboardRemove())  # , reply_markup=ReplyKeyboardRemove()
         question_wiki = wikipedia.page(str(data['question']))
         await message.answer('Ссылка на статью: \n' + question_wiki.url)
         await message.answer('Название статьи: \n' + question_wiki.original_title)
-        await message.answer('Статья: \n' + question_wiki.summary + '\nДля того чтобы узнать дополнительную информацию введите\n/Дополнительная информация, а чтобы вернуться к главному меню /Отмена', reply_markup=additional_kboard)
+        await message.answer('Статья: \n' + question_wiki.summary + '\nДля того чтобы узнать дополнительную информацию введите\n/Дополнительная информация, а чтобы вернуться к главному меню /Отмена',reply_markup=additional_kboard)
     elif seearch == False:
+
         wikipedia.set_lang('en')
         async with state.proxy() as data:
             data['question'] = message.text
         await FSMRequest.next()  # перевод на следующее состояние
-        await message.answer('Вот что нашлось по вашему запросу ' + str(data['question']) + ':', reply_markup=ReplyKeyboardRemove())  # , reply_markup=ReplyKeyboardRemove()
+        await message.answer('Вот что нашлось по вашему запросу ' + str(data['question']) + ':',
+                             reply_markup=ReplyKeyboardRemove())  # , reply_markup=ReplyKeyboardRemove()
         question_wiki = wikipedia.page(str(data['question']))
         await message.answer('Ссылка на статью: \n' + question_wiki.url)
         await message.answer('Название статьи: \n' + question_wiki.original_title)
-        await message.answer('Статья: \n' + question_wiki.summary + '\nДля того чтобы узнать дополнительную информацию введите\n/Дополнительная информация, а чтобы вернуться к главному меню /Отмена', reply_markup=additional_kboard)
+        await message.answer('Статья: \n' + question_wiki.summary + '\nДля того чтобы узнать дополнительную информацию введите\n/Дополнительная информация, а чтобы вернуться к главному меню /Отмена',reply_markup=additional_kboard)
 
 
-#@dp.message_handler(state=FSMRequest.additional_question_request)
-async def request_additional_questions(message : types.Message, state: FSMContext):
+# @dp.message_handler(state=FSMRequest.additional_question_request)
+async def request_additional_questions(message: types.Message, state: FSMContext):
+    '''
+    В данной функции мы получаем ответ от пользователя.
+    Проверяем, на каком языке сделан поисковой запрос.
+    Благодаря полученному ответу определяем какая часть кода будет работать.
+    Мы присваеваем заголовок переменной 'name', которая будет использоваться для формирования ссылок, на разделы статьи
+    и для вывода разделов.
+    Благодаря полученному заголовку, мы формируем ссылку, путём складывания ссылки на основную страницу wikipedia и
+    нашего зоголовка. После чего мы получаем HTML код страницы, в котором находим класс "div" с id "toc" и уже в нём ищем
+    класс "ul", в которм собираем все классы "a", из которых получаем ссылки из класса "href".
+    После проделанного действия мы отправляем пользователю список разделов страницы, которую он хотел найти.
+    :param message: это сообщения получаемые от пользователя
+    :param state: FSMContext состояние, взятое из машины состояний, в котором находиться эта функция
+    :return:это сообщения,которые пользователь получает от бота, в которых бот передаёт найденную информацию
+    '''
     def match(text, alphabet=set('абвгдеёжзийклмнопрстуфхцчшщъыьэюя')):
         return not alphabet.isdisjoint(text.lower())
+    """
+    Объявляем функцию 'match', которая сравнивае вводимое значение и если оно совпадает с переменной 'aphabet'(Русский алфавит) - 
+    то оно выдаёт 'bool' значение 'True', в противном случае 'False'. Это нужно для проверки языка, на которм пользователь хочет найти информацию.
+    """
     async with state.proxy() as data:
         seearch = match(str(data['question']))
         question_wiki = wikipedia.page(str(data['question']))
@@ -95,17 +135,38 @@ async def request_additional_questions(message : types.Message, state: FSMContex
         for i in links:
             url = i.get("href")
             await message.answer(url)
-    await message.answer('Введите название подстатьи которую хотите прочитать, если вы передумали нажмите /Отмена', reply_markup=cancel_kboard)
+    await message.answer('Введите название подстатьи которую хотите прочитать, если вы передумали нажмите /Отмена',reply_markup=cancel_kboard)
     await FSMRequest.next()
 
 
-
-#@dp.message_handler(state=FSMRequest.additional_question)
-async def get_additional_question(message : types.Message, state: FSMContext):
+# @dp.message_handler(state=FSMRequest.additional_question)
+async def get_additional_question(message: types.Message, state: FSMContext):
+    '''
+    В данной функции мы получаем ответ от пользователя.
+    Проверяем, на каком языке сделан поисковой запрос.
+    Благодаря полученному ответу определяем какая часть кода будет работать.
+    Мы присваеваем заголовок переменной 'name', которая будет использоваться для формирования ссылок, на разделы статьи
+    и для вывода разделов.
+    Благодаря полученному заголовку, мы формируем ссылку, путём складывания ссылки на основную страницу wikipedia и
+    нашего зоголовка. После чего мы получаем HTML код страницы, в котором находим класс "div" с id "toc" и уже в нём ищем
+    класс "ul", в которм собираем все классы "a", из которых получаем ссылки из класса "href".
+    После чего мы формируем список из разделов страницы.
+    сравниваем каждый элемент списка с сообщением, полученным от пользователя, если совпадение найдено, делаем скриншот
+    странцы, отправляем его пользователю вместе с ссылкой на данный раздел, если же совпадение не найдено, отправляем 
+    пользователю ответ с сообщением, что такой раздел не найден.
+    :param message: это сообщения получаемые от пользователя
+    :param state: FSMContext состояние, взятое из машины состояний, в котором находиться эта функция
+    :return:это сообщения,которые пользователь получает от бота, в которых бот передаёт найденную информацию
+    '''
     async with state.proxy() as data:
         question_wiki = wikipedia.page(str(data['question']))
+
     def match(text, alphabet=set('абвгдеёжзийклмнопрстуфхцчшщъыьэюя')):
         return not alphabet.isdisjoint(text.lower())
+    """
+    Объявляем функцию 'match', которая сравнивае вводимое значение и если оно совпадает с переменной 'aphabet'(Русский алфавит) - 
+    то оно выдаёт 'bool' значение 'True', в противном случае 'False'. Это нужно для проверки языка, на которм пользователь хочет найти информацию.
+    """
     answer = message.text
     await message.answer('Подстатья ' + str(answer) + ':')
     manswer = match(answer)
@@ -132,6 +193,7 @@ async def get_additional_question(message : types.Message, state: FSMContext):
                     rec = requests.get(link, params=l[k])
                 if urlt == False:
                     rec = link + l[k]
+                #Данный участок кода был взят из этого видео:https://www.youtube.com/watch?v=KuQZN2kxftg
                 option = webdriver.ChromeOptions()
                 option.add_argument("headless")
                 driver = webdriver.Chrome(chrome_options=option)
@@ -139,9 +201,12 @@ async def get_additional_question(message : types.Message, state: FSMContext):
                 driver.save_screenshot("scrn.png")
                 driver.close()
                 photo = open("scrn.png", 'rb')
+                #конец заимствования
                 await message.answer_photo(photo=photo)
                 rurl = rec.url
                 await message.answer('Ссылка на статью:' + rurl)
+            else:
+                await message.answer("Такой раздел не найден")
     if manswer == False:
         wikipedia.set_lang('en')
         name = question_wiki.original_title
@@ -165,14 +230,16 @@ async def get_additional_question(message : types.Message, state: FSMContext):
                 photo = open("scrn.png", 'rb')
                 await message.answer_photo(photo=photo)
                 await message.answer('Ссылка на статью:' + recc)
+            else:
+                await message.answer("Такой раздел не найден")
     await message.answer('Если вы хотите прочитать еще одну подстатью введите ее название, если вы хотите выйти из запроса введите /Отмена')
 
-    
 
-def register_handlers_wikipedia_request(dp : Dispatcher):
+def register_handlers_wikipedia_request(dp: Dispatcher):
     dp.register_message_handler(cm_start, commands=['Запрос'], state=None)
     dp.register_message_handler(cancel_command, state="*", commands=['Отмена'])
     dp.register_message_handler(cancel_command, Text(equals=['отмена', 'Отмена'], ignore_case=True), state="*")
     dp.register_message_handler(get_question, state=FSMRequest.question)
-    dp.register_message_handler(request_additional_questions, state=FSMRequest.additional_question_request, commands=['Дополнительная_информация']) #, commands=['/дополнительная_информация']
+    dp.register_message_handler(request_additional_questions, state=FSMRequest.additional_question_request,
+                                commands=['Дополнительная_информация'])  # , commands=['/дополнительная_информация']
     dp.register_message_handler(get_additional_question, state=FSMRequest.additional_question)
